@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Call {
+  id              String    @id @default(cuid())
+  vapiCallId      String?   @unique
+  customerNumber  String
+  status          String    @default("scheduled") // scheduled, ringing, in-progress, completed, failed, no-answer
+  scenarioType    String?   // appointment, product_info, feedback
+  scriptId        String?
+  script          AgentScript? @relation(fields: [scriptId], references: [id])
+  transcript      String?   @db.Text
+  recordingUrl    String?
+  startedAt       DateTime?
+  endedAt         DateTime?
+  durationSeconds Int?
+  metadata       Json?     // raw VAPI payload / custom data
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([status, createdAt])
+  @@index([customerNumber])
+}
+
+model AgentScript {
+  id           String   @id @default(cuid())
+  name         String
+  scenarioType String   // appointment, product_info, feedback
+  systemPrompt String   @db.Text
+  firstMessage String   @db.Text
+  options      Json?    // DTMF options, etc.
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  calls        Call[]
+}
+
+
+model Lead {
+  id          String   @id @default(cuid())
+  name        String?
+  email       String?
+  phone       String?
+  message     String?   @db.Text
+  source      String?   // e.g. website, funnel, form-id
+  status      String    @default("new") // new, contacted, qualified, won, lost
+  tags        String?   // comma-separated for simplicity
+  metadata    Json?
+  callStatus  String?   @default("pending") // pending, scheduled, ringing, completed, failed, no-answer
+  callAttempts Int      @default(0)
+  lastCallAt  DateTime?
+  nextCallAt  DateTime?
+  userId      String?
+  user        User?     @relation(fields: [userId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  passwordHash   String
+  name           String?
+  onboardingDone Boolean  @default(false)
+  leads          Lead[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+/// Singleton table for workspace / business settings
+model WorkspaceSettings {
+  id                Int     @id @default(1)
+  businessName      String? 
+  websiteUrl        String?
+  logoUrl           String?
+  phoneNumber       String?
+  email             String?
+  address           String?
+  integrationApiKey String  @unique
+  vapiApiKey        String?
+  vapiPublicKey     String?
+  vapiBaseUrl       String? @default("https://api.vapi.ai")
+  vapiPhoneNumberId String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
