@@ -19,8 +19,16 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     fetch("/api/settings")
-      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => {
+        if (r.status === 401) {
+          const next = encodeURIComponent(pathname);
+          window.location.href = `/auth/login?next=${next}`;
+          return null;
+        }
+        return r.ok ? r.json() : null;
+      })
       .then((settings: MinimalSettings | null) => {
+        if (settings === null && pathname) return;
         const missing = !settings?.vapiApiKey || !settings?.vapiPhoneNumberId;
         setNeedsVapi(missing);
       })
@@ -28,7 +36,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
         setNeedsVapi(true);
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [pathname]);
 
   let content: ReactNode = children;
 
